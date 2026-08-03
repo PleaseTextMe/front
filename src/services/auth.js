@@ -1,4 +1,5 @@
 import users from '../config/users.json';
+import { cryptoService } from './crypto';
 
 const SESSION_KEY = 'chat_session_user';
 const LOCAL_USERS_KEY = 'chat_registered_users';
@@ -27,7 +28,33 @@ export const authService = {
     return false;
   },
 
-  register: (email, login, password) => {
+  register: async (email, login, password) => {
+    try {
+      // мок запрос за солью (get /auth/salt)
+      const saltHex = await cryptoService.generateMockSalt();
+      
+      // генерим ключи и вольт (сейф) (занимает ~500мс из-за argon2id)
+      const cryptoData = await cryptoService.generateRegistrationData(password, saltHex);
+      
+      // мокируем 3 запроса на бэкенд
+      console.log('mock api: post /auth/register', { username: login, auth_hash: cryptoData.authHash });
+      console.log('mock api: post /keys/vault', cryptoData.vault);
+      console.log('mock api: post /keys/public', cryptoData.publicBundle);
+      
+      // сохраняем фейковый jwt токен (типа chekcSession потом сработает)
+      const mockJwt = { email, login, token: 'mock_jwt_token_from_server' };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(mockJwt));
+      
+      return true;
+    } catch (error) {
+      console.error('registration error:', error);
+      return false;
+    }
+  },
+
+  /*
+  я его больше не использую (оставлено на всякий самый случай)
+  register_old: (email, login, password) => {
     // АРКАДИЙ, вся эта логика с регистрацией в localstorage — это временная заглушка (костыль)
     // потом этот блок можно будет полностью вырезать при подключении нормального бэкенда
     const localUsers = getLocalUsers();
@@ -48,6 +75,7 @@ export const authService = {
     localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
     return true;
   },
+  */
   
   logout: () => {
     localStorage.removeItem(SESSION_KEY);

@@ -10,7 +10,7 @@ function AuthPage({ onLogin }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     
@@ -19,7 +19,9 @@ function AuthPage({ onLogin }) {
         setError(strings.auth.errorPasswordsNotMatch);
         return;
       }
-      if (authService.register(email, login, password)) {
+      
+      const success = await authService.register(email, login, password);
+      if (success) {
         onLogin();
       } else {
         setError(strings.auth.errorUserExists);
