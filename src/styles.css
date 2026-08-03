@@ -38,6 +38,7 @@ body, html {
     padding: 12px;
     font-size: 18px;
     cursor: pointer;
+    transition: background 0.2s;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -70,11 +71,18 @@ body, html {
     width: 50px;
     height: 50px;
     background-color: #dcdcdc;
-    border-radius: 0;
+    border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
     margin-right: 20px;
+    overflow: hidden;
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .avatar svg {
@@ -132,7 +140,7 @@ body, html {
     background-color: #5B2D2C;
     color: white;
     padding: 10px 15px;
-    border-radius: 0;
+    border-radius: 12px;
     max-width: 70%;
     align-self: flex-end;
     font-size: 16px;
@@ -185,7 +193,7 @@ body, html {
 .input-wrapper {
     flex: 1;
     border: 1px solid rgba(255, 255, 255, 0.8);
-    border-radius: 0;
+    border-radius: 4px;
     padding: 12px 20px;
     display: flex;
     align-items: center;
@@ -218,7 +226,7 @@ body, html {
 .auth-box {
     background-color: rgba(0, 0, 0, 0.2);
     padding: 40px;
-    border-radius: 0;
+    border-radius: 12px;
     width: 100%;
     max-width: 400px;
     display: flex;
@@ -249,11 +257,12 @@ body, html {
     background-color: rgba(255, 255, 255, 0.9);
     color: #5B2D2C;
     border: none;
-    border-radius: 0;
+    border-radius: 4px;
     padding: 15px;
     font-size: 18px;
     font-weight: bold;
     cursor: pointer;
+    transition: background 0.2s;
     text-transform: uppercase;
     margin-top: 10px;
 }
@@ -273,6 +282,7 @@ body, html {
     cursor: pointer;
     font-size: 14px;
     text-decoration: underline;
+    transition: color 0.2s;
 }
 
 .auth-toggle:hover {
