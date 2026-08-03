@@ -1,13 +1,17 @@
 import React from 'react';
 import { strings } from '../config/strings';
+import profilePic from '../profile.jpg';
 
 function ChatHeader() {
   return (
     <div className="chat-header">
       <div className="avatar">
+        {/*
         <svg viewBox="0 0 24 24">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
+        */}
+        <img src={profilePic} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
       <div className="user-info">
         <h2>{strings.header.contactName}</h2>
