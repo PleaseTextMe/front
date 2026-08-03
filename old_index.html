@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чат Интерфейс (На весь экран)</title>
+    <style>
+        /* Сброс базовых стилей и отключение скролла */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Убираем ползунки прокрутки */
+            background-color: #5B2D2C; /* Основной бордовый цвет */
+            color: #ffffff;
+        }
+
+        /* Главный контейнер на весь экран */
+        .app-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Левая панель с кнопками */
+        .sidebar {
+            width: 250px; /* Сделал чуть шире для большого экрана */
+            padding: 80px 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #5B2D2C;
+        }
+
+        .sidebar button {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            color: white;
+            padding: 12px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sidebar button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar button:active {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Правая часть с чатом */
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Шапка чата */
+        .chat-header {
+            display: flex;
+            align-items: center;
+            padding: 20px 30px;
+            height: 90px;
+            background-color: #5B2D2C;
+        }
+
+        .avatar {
+            width: 50px;
+            height: 50px;
+            background-color: #dcdcdc;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 20px;
+        }
+
+        .avatar svg {
+            width: 35px;
+            height: 35px;
+            fill: #5B2D2C;
+            margin-top: 5px;
+        }
+
+        .user-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .user-info h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .user-info span {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .menu-btn {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .menu-btn svg {
+            width: 28px;
+            height: 28px;
+            fill: white;
+        }
+
+        /* Область истории сообщений */
+        .chat-history {
+            flex: 1;
+            background-color: #dcdcdc; /* Светло-серый фон окна чата */
+            position: relative;
+        }
+
+        /* Блик в правом нижнем углу */
+        .sparkle {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            opacity: 0.5;
+        }
+
+        .sparkle svg {
+            fill: white;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Область ввода сообщения */
+        .chat-input-area {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            padding: 0 30px 0 15px;
+            gap: 15px;
+            background-color: #5B2D2C;
+        }
+
+        .attach-btn {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .attach-btn svg {
+            width: 28px;
+            height: 28px;
+            fill: white;
+            transform: rotate(45deg);
+        }
+
+        .input-wrapper {
+            flex: 1;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 4px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            background: transparent;
+        }
+
+        .input-wrapper input {
+            background: transparent;
+            border: none;
+            color: white;
+            width: 100%;
+            font-size: 18px;
+            outline: none;
+        }
+
+        .input-wrapper input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Боковая панель -->
+        <div class="sidebar">
+            <button onclick="handleAction('Клоун')">Клоун</button>
+            <button onclick="handleAction('Осёл')">Осёл</button>
+            <button onclick="handleAction('Жмот')">Жмот</button>
+        </div>
+
+        <!-- Основная область чата -->
+        <div class="main-chat">
+            <!-- Шапка -->
+            <div class="chat-header">
+                <div class="avatar">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                </div>
+                <div class="user-info">
+                    <h2>Пидор (Хопсо)</h2>
+                    <span>Был в сети...</span>
+                </div>
+                <div class="menu-btn">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- История сообщений -->
+            <div class="chat-history">
+                <div class="sparkle">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2L15 9L22 12L15 15L12 22L9 15L2 12L9 9L12 2Z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Ввод сообщения -->
+            <div class="chat-input-area">
+                <div class="attach-btn" onclick="attachFile()">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>
+                    </svg>
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" id="messageInput" placeholder="Напишите сообщение..." onkeypress="handleEnter(event)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Скрипты для базовой работы интерфейса -->
+    <script>
+        function handleAction(type) {
+            console.log(`Выбрано действие: ${type}`);
+        }
+
+        function attachFile() {
+            console.log('Клик по иконке скрепки');
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                const input = document.getElementById('messageInput');
+                if (input.value.trim() !== '') {
+                    console.log(`Отправлено: ${input.value}`);
+                    input.value = ''; // Очистка поля
+                }
+            }
+        }
+    </script>
+</body>
+</html>

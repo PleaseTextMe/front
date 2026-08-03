@@ -1,0 +1,12 @@
+[
+  {
+    "email": "admin@mail.ru",
+    "login": "admin",
+    "password": "123"
+  },
+  {
+    "email": "pizda@pizda.com",
+    "login": "lol123",
+    "password": "pidor"
+  }
+]
