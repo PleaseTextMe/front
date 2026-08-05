@@ -6,43 +6,69 @@
 export const strings = {
   // === авторизация ===
   auth: {
-    title: "Вход в систему",
-    emailPlaceholder: "Email",
-    loginPlaceholder: "Логин",
-    passwordPlaceholder: "Пароль",
-    submitButton: "Войти",
-    errorInvalidData: "Неверный email, логин или пароль",
-    registerTitle: "Регистрация",
-    registerSubmitButton: "Зарегистрироваться",
-    toRegisterText: "Нет аккаунта? Зарегаться",
-    toLoginText: "Уже есть аккаунт? Войти",
-    errorUserExists: "Пользователь с таким логином или email уже существует",
-    errorPasswordsNotMatch: "Пароли не совпадают",
+    title: "=== SYSTEM LOGIN ===",
+    emailPlaceholder: "email:",
+    loginPlaceholder: "username:",
+    passwordPlaceholder: "password:",
+    confirmPasswordPlaceholder: "confirm_pwd:",
+    submitButton: "[ LOGIN ]",
+    errorInvalidData: "[ERROR] неверные данные",
+    registerTitle: "=== USER REGISTRATION ===",
+    registerSubmitButton: "[ REGISTER ]",
+    toRegisterText: "[ GO_TO_REGISTER ]",
+    toLoginText: "[ GO_TO_LOGIN ]",
+    errorUserExists: "[ERROR] юзер существует",
+    errorPasswordsNotMatch: "[ERROR] пароли не совпадают",
+    verificationTitle: "=== 2FA VERIFICATION ===",
+    verificationSubtitle: "enter 6-digit code from email:",
+    verificationPlaceholder: "code:",
+    getCodeButton: "[ GET CODE ]",
+    verifySubmitButton: "[ VERIFY CODE ]",
+    emailVerifiedText: "[ EMAIL VERIFIED ]",
+    errorInvalidCode: "[ERROR] access denied. invalid code.",
+  },
+
+  profile: {
+    title: "=== PROFILE SETTINGS ===",
+    uploadLabel: "select photo:",
+    resolutionLabel: "ascii resolution:",
+    saveButton: "[ SAVE AVATAR ]",
+    backButton: "[ BACK TO CHAT ]"
   },
 
   // === сайдбар ===
   sidebar: {
-    button1: "Веня",
-    button2: "Осёл (Тонинша)",
-    button3: "Аркадий",
-    logoutButton: "Выйти",
+    title: "=== USERS ===",
+    usersList: ['веня', 'осёл', 'аркадий'],
+    logoutButton: "[ LOGOUT ]",
   },
 
   // === хэдер ===
   header: {
-    contactName: "Пидор (Хопсо)",
-    status: "Был в сети 13:37",
+    contactName: "пидор (хопсо)",
+    status: "в сети",
+    menuButton: "[ MENU ]",
+    prefix: "connected to: ",
+    statusPrefix: "status: "
   },
 
   // === инпут ===
   input: {
-    placeholder: "Напишите сообщение...",
+    prompt: "user@chat:~$",
+    submitButton: "[ SEND ]",
+  },
+
+  // === чат (history) ===
+  chat: {
+    systemUser: "<system>:",
+    localUser: "<you>:",
+    connectionMsg: " connection established.",
   },
 
   // === логи (хз зачем) ===
   logs: {
-    actionSelected: "действие:",
-    messageSent: "отправлено:",
-    attachmentClicked: "атачмент",
+    actionSelected: "action:",
+    messageSent: "message:",
+    attachmentClicked: "attachment",
   }
 };

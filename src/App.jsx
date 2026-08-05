@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import ChatHeader from './components/ChatHeader';
-import ChatHistory from './components/ChatHistory';
-import ChatInput from './components/ChatInput';
-import AuthPage from './components/AuthPage';
-import { strings } from './config/strings';
-import { authService } from './services/auth';
+import Sidebar from './components/templates/Sidebar.jsx';
+import ChatHeader from './components/templates/ChatHeader.jsx';
+import ChatHistory from './components/templates/ChatHistory.jsx';
+import ChatInput from './components/templates/ChatInput.jsx';
+import AuthPage from './components/templates/AuthPage.jsx';
+import AsciiFrame from './components/templates/AsciiFrame.jsx';
+import ProfileSettings from './components/templates/ProfileSettings.jsx';
+import { strings } from './config/strings.js';
+import { authService } from './services/auth.js';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentView, setCurrentView] = useState('chat'); // 'chat' | 'profile'
   const [messages, setMessages] = useState([]);
 
+  // проверяем наличие сессии в локалсторадже при загрузке апликухи
   useEffect(() => {
     if (authService.checkSession()) {
       setIsAuthenticated(true);
@@ -18,16 +22,16 @@ function App() {
   }, []);
 
   const handleAction = (type) => {
-    console.log(`${strings.logs.actionSelected} ${type}`);
+    console.log(`action: ${type}`);
+  };
+
+  const handleMenuClick = () => {
+    setCurrentView('profile');
+    console.log(`${strings.logs.actionSelected} menu`);
   };
 
   const handleSendMessage = (text) => {
-    console.log(`${strings.logs.messageSent} ${text}`);
     setMessages([...messages, { id: Date.now(), text }]);
-  };
-
-  const handleAttachFile = () => {
-    console.log(strings.logs.attachmentClicked);
   };
 
   const handleLogout = () => {
@@ -43,9 +47,17 @@ function App() {
     <div className="app-container">
       <Sidebar onAction={handleAction} onLogout={handleLogout} />
       <div className="main-chat">
-        <ChatHeader />
-        <ChatHistory messages={messages} />
-        <ChatInput onSendMessage={handleSendMessage} onAttachFile={handleAttachFile} />
+        <AsciiFrame>
+          {currentView === 'chat' ? (
+            <>
+              <ChatHeader onMenuClick={handleMenuClick} />
+              <ChatHistory messages={messages} />
+              <ChatInput onSendMessage={handleSendMessage} />
+            </>
+          ) : (
+            <ProfileSettings onBack={() => setCurrentView('chat')} />
+          )}
+        </AsciiFrame>
       </div>
     </div>
   );
