@@ -3,6 +3,14 @@ import _sodium from 'libsodium-wrappers-sumo';
 // утилиты для конвертации данных
 const strToUint8Array = (str) => new TextEncoder().encode(str);
 const uint8ArrayToBase64 = (arr) => btoa(String.fromCharCode.apply(null, arr));
+const base64ToUint8Array = (base64) => {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+};
 
 export const cryptoService = {
   // инициализация libsodium
@@ -11,19 +19,15 @@ export const cryptoService = {
     return _sodium;
   },
 
-  // мок запрос за солью
-  generateMockSalt: async () => {
-    const sodium = await cryptoService.init();
-    const salt = sodium.randombytes_buf(16);
-    return sodium.to_hex(salt);
-  },
+  // статичная соль (заглушка для argon2id, так как мы отказались от серверной соли)
+  staticSalt: new Uint8Array(16),
 
   // генерим ключи и вольт (сейф) при регистрации
-  generateRegistrationData: async (password, saltHex) => {
+  generateRegistrationData: async (password) => {
     const sodium = await cryptoService.init();
     
-    // деривация ключей (kdf)
-    const salt = sodium.from_hex(saltHex);
+    // деривация ключей (kdf) с использованием хардкодной соли
+    const salt = cryptoService.staticSalt;
     
     const derivedKey = sodium.crypto_pwhash(
       64,
@@ -102,5 +106,55 @@ export const cryptoService = {
         signature: uint8ArrayToBase64(signature)
       }
     };
+  },
+
+  // расшифровка vault при логине
+  decryptVault: async (password, vaultData) => {
+    const sodium = await cryptoService.init();
+    const salt = cryptoService.staticSalt;
+
+    // 1. Деривация ключа для расшифровки
+    const derivedKey = sodium.crypto_pwhash(
+      64,
+      strToUint8Array(password),
+      salt,
+      sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
+      sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+      sodium.crypto_pwhash_ALG_ARGON2ID13
+    );
+    const keyVault = derivedKey.slice(32, 64);
+
+    // 2. Декодируем base64 в байты
+    const ciphertext = base64ToUint8Array(vaultData.encrypted_payload);
+    const authTag = base64ToUint8Array(vaultData.auth_tag);
+    const nonce = base64ToUint8Array(vaultData.nonce);
+
+    // 3. Web Crypto API требует склеенный буфер (ciphertext + auth_tag)
+    const encryptedBuffer = new Uint8Array(ciphertext.length + authTag.length);
+    encryptedBuffer.set(ciphertext);
+    encryptedBuffer.set(authTag, ciphertext.length);
+
+    // 4. Расшифровываем
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      keyVault,
+      "AES-GCM",
+      false,
+      ["decrypt"]
+    );
+    
+    try {
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: nonce },
+        cryptoKey,
+        encryptedBuffer
+      );
+      
+      const decryptedString = new TextDecoder().decode(decryptedBuffer);
+      return JSON.parse(decryptedString); // { identity_priv_ed25519, ... }
+    } catch (e) {
+      console.error("Vault decryption failed:", e);
+      return null;
+    }
   }
 };

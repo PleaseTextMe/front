@@ -3,6 +3,7 @@ import { cryptoService } from './crypto';
 
 const SESSION_KEY = 'chat_session_user';
 const LOCAL_USERS_KEY = 'chat_registered_users';
+const API_BASE = 'http://localhost:8000/api/v1/auth';
 
 const getLocalUsers = () => {
   const data = localStorage.getItem(LOCAL_USERS_KEY);
@@ -10,71 +11,141 @@ const getLocalUsers = () => {
 };
 
 export const authService = {
-  login: (login, password) => {
-    // ищем пользователя, у которого совпадают логин и пароль
-    let user = users.find(u => u.login === login && u.password === password);
-    
-    // если не нашли в users.json, ищем в localstorage
-    if (!user) {
-      const localUsers = getLocalUsers();
-      user = localUsers.find(u => u.login === login && u.password === password);
-    }
-    
-    if (user) {
-      // сохраняем сессию в localstorage
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  login: async (email, password) => {
+    try {
+      // 1. Делаем POST запрос для логина (получаем auth_token)
+      const loginResponse = await fetch(`${API_BASE}/login/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error('invalid credentials');
+      }
+      
+      const loginData = await loginResponse.json();
+      const authToken = loginData.auth_token;
+
+      // 2. Получаем профиль пользователя, чтобы достать vault
+      const meResponse = await fetch(`${API_BASE}/me/`, {
+        method: 'GET',
+        headers: { 'x-auth-token': authToken }
+      });
+
+      if (!meResponse.ok) {
+        throw new Error('failed to get profile');
+      }
+
+      const user = await meResponse.json();
+
+      // 3. Расшифровываем vault с помощью пароля
+      const decryptedKeys = await cryptoService.decryptVault(password, user.vault);
+      if (!decryptedKeys) {
+        throw new Error('failed to decrypt vault (wrong password?)');
+      }
+
+      // 4. Сохраняем сессию
+      const sessionData = {
+        email: user.email,
+        login: user.username,
+        token: authToken,
+        keys: decryptedKeys
+      };
+      
+      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
       return true;
+    } catch (e) {
+      console.error('login error:', e);
+      return false;
     }
-    return false;
   },
 
   requestCode: async (email) => {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const sessionId = 'mock-uuid-' + Date.now();
-        console.log(`[system] redis mock: saved session ${sessionId} for ${email} with code ${code}`);
-        resolve({ success: true, sessionId, code });
-      }, 500); // имитация задержки сети
-    });
+    try {
+      const response = await fetch(`${API_BASE}/send-verify-code/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          return { success: false, error: 'User already exists' };
+        }
+        throw new Error('failed to send code');
+      }
+      const data = await response.json();
+      return { success: true, verifyToken: data.verify_token };
+    } catch (e) {
+      console.error(e);
+      return { success: false };
+    }
   },
 
-  register: async (email, login, password, sessionId) => {
+  verifyCode: async (email, code, verifyToken) => {
     try {
-      // мок запрос за солью (get /auth/salt)
-      const saltHex = await cryptoService.generateMockSalt();
+      const response = await fetch(`${API_BASE}/check-verify-code/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email, 
+          code: parseInt(code, 10), 
+          verify_token: verifyToken 
+        })
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          return { success: false, error: 'User already exists' };
+        }
+        return { success: false, error: 'Invalid code' };
+      }
+      const data = await response.json();
+      return { success: data.is_verified };
+    } catch (e) {
+      console.error(e);
+      return { success: false, error: 'Network error' };
+    }
+  },
+
+  register: async (email, login, password, verifyToken) => {
+    try {
+      // генерим ключи и вольт (сейф) без соли (используем статичную внутри crypto.js)
+      const cryptoData = await cryptoService.generateRegistrationData(password);
       
-      // генерим ключи и вольт (сейф) (занимает ~500мс из-за argon2id)
-      const cryptoData = await cryptoService.generateRegistrationData(password, saltHex);
-      
-      // формируем монолитный json в точности как договорились с бэкендом (pydantic snake_case)
+      // формируем нормальный вложенный json для бэкенда
       const payload = {
         email: email,
         username: login,
-        verify_token: sessionId,
+        verify_token: verifyToken,
         password: password,
-        salt: saltHex,
-        public_bundle_json: JSON.stringify({
+        public_bundle: {
           bundle_json: cryptoData.publicBundle.bundleJson,
           signature: cryptoData.publicBundle.signature
-        }),
-        vault_json: JSON.stringify({
+        },
+        vault: {
           encrypted_payload: cryptoData.vault.encryptedPayload,
           nonce: cryptoData.vault.nonce,
           auth_tag: cryptoData.vault.authTag
-        })
+        }
       };
       
-      console.log('[system] mock api: POST /api/v1/auth/register', payload);
+      console.log('[system] api: POST /api/v1/auth/register', payload);
       
-      // сохраняем фейковый auth токен (типа checkSession потом сработает)
-      const mockAuthToken = { email, login, token: 'mock_unlimited_auth_token_from_server' };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(mockAuthToken));
+      const response = await fetch(`${API_BASE}/register/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('registration failed on backend');
+      }
+
+      const data = await response.json();
       
-      // костыль для мока: сохраняем креды, чтобы можно было залогиниться после логаута
-      const localUsers = getLocalUsers();
-      localUsers.push({ email, login, password });
-      localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(localUsers));
+      // сохраняем реальный auth токен от сервера
+      const authToken = { email, login, token: data.auth_token };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(authToken));
       
       return true;
     } catch (error) {
@@ -83,29 +154,6 @@ export const authService = {
     }
   },
 
-  /*
-  я его больше не использую (костыль(оставлено на всякий самый случай))
-  register_old: (email, login, password) => {
-    const localUsers = getLocalUsers();
-    
-    // проверяем, не занят ли логин или email (в обоих хранилищах)
-    const isTaken = users.some(u => u.login === login || u.email === email) ||
-                    localUsers.some(u => u.login === login || u.email === email);
-    
-    if (isTaken) {
-      return false; 
-    }
-
-    const newUser = { email, login, password };
-    localUsers.push(newUser);
-    localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(localUsers));
-    
-    // сразу авторизуем после регистрации
-    localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
-    return true;
-  },
-  */
-  
   logout: () => {
     localStorage.removeItem(SESSION_KEY);
   },

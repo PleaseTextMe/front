@@ -16,8 +16,7 @@ function AuthPage({ onLogin }) {
 
   // 2fa стейты
   const [verificationCode, setVerificationCode] = useState('');
-  const [expectedCode, setExpectedCode] = useState('');
-  const [sessionId, setSessionId] = useState('');
+  const [verifyToken, setVerifyToken] = useState('');
   
   // индикаторы загрузки
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +27,11 @@ function AuthPage({ onLogin }) {
 
     // логин
     if (!isRegisterMode) {
-      if (authService.login(login, password)) {
+      setIsLoading(true);
+      const success = await authService.login(email, password);
+      setIsLoading(false);
+      
+      if (success) {
         onLogin();
       } else {
         setError(strings.auth.errorInvalidData);
@@ -44,7 +47,7 @@ function AuthPage({ onLogin }) {
       }
       
       setIsLoading(true);
-      const success = await authService.register(email, login, password, sessionId);
+      const success = await authService.register(email, login, password, verifyToken);
       setIsLoading(false);
       
       if (success) {
@@ -62,18 +65,33 @@ function AuthPage({ onLogin }) {
     const res = await authService.requestCode(email);
     setIsLoading(false);
     
-    setExpectedCode(res.code);
-    setSessionId(res.sessionId);
-    setRegisterStep(2);
+    if (res.success) {
+      setVerifyToken(res.verifyToken);
+      setRegisterStep(2);
+    } else {
+      if (res.error === 'User already exists') {
+        setError(strings.auth.errorUserExists);
+      } else {
+        setError(strings.auth.errorInvalidData || 'error sending code');
+      }
+    }
   };
 
-  const handleVerifyCode = () => {
+  const handleVerifyCode = async () => {
     setError('');
-    if (verificationCode === expectedCode) {
+    setIsLoading(true);
+    const result = await authService.verifyCode(email, verificationCode, verifyToken);
+    setIsLoading(false);
+
+    if (result.success) {
       setRegisterStep(3);
       console.log('[system] email verified. starting background key generation while user types password...');
     } else {
-      setError(strings.auth.errorInvalidCode);
+      if (result.error === 'User already exists') {
+        setError(strings.auth.errorUserExists);
+      } else {
+        setError(strings.auth.errorInvalidCode);
+      }
     }
   };
 
@@ -111,10 +129,10 @@ function AuthPage({ onLogin }) {
                 <div className="auth-input-row">
                   <div className="input-wrapper">
                     <input 
-                      type="text" 
-                      value={login}
-                      onChange={(e) => setLogin(e.target.value)}
-                      placeholder={strings.auth.loginPlaceholder}
+                      type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={strings.auth.emailPlaceholder || "Email"}
                       required
                     />
                   </div>
@@ -131,7 +149,9 @@ function AuthPage({ onLogin }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '20px' }}>
-                  <button type="submit">{strings.auth.submitButton}</button>
+                  <button type="submit" disabled={isLoading}>
+                    {isLoading ? '...' : strings.auth.submitButton}
+                  </button>
                   <button type="button" onClick={toggleMode}>{strings.auth.toRegisterText}</button>
                 </div>
               </>
@@ -186,8 +206,8 @@ function AuthPage({ onLogin }) {
                       </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '20px' }}>
-                      <button type="button" onClick={handleVerifyCode}>
-                        {strings.auth.verifySubmitButton}
+                      <button type="button" onClick={handleVerifyCode} disabled={isLoading || verificationCode.length < 6}>
+                        {isLoading ? '...' : strings.auth.verifySubmitButton}
                       </button>
                       <button type="button" onClick={() => setRegisterStep(1)}>
                         [ CANCEL ]
