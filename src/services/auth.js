@@ -28,7 +28,18 @@ export const authService = {
     return false;
   },
 
-  register: async (email, login, password) => {
+  requestCode: async (email) => {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const sessionId = 'mock-uuid-' + Date.now();
+        console.log(`[system] redis mock: saved session ${sessionId} for ${email} with code ${code}`);
+        resolve({ success: true, sessionId, code });
+      }, 500); // имитация задержки сети
+    });
+  },
+
+  register: async (email, login, password, sessionId) => {
     try {
       // мок запрос за солью (get /auth/salt)
       const saltHex = await cryptoService.generateMockSalt();
@@ -36,14 +47,34 @@ export const authService = {
       // генерим ключи и вольт (сейф) (занимает ~500мс из-за argon2id)
       const cryptoData = await cryptoService.generateRegistrationData(password, saltHex);
       
-      // мокируем 3 запроса на бэкенд
-      console.log('mock api: post /auth/register', { username: login, auth_hash: cryptoData.authHash });
-      console.log('mock api: post /keys/vault', cryptoData.vault);
-      console.log('mock api: post /keys/public', cryptoData.publicBundle);
+      // формируем монолитный json в точности как договорились с бэкендом (pydantic snake_case)
+      const payload = {
+        email: email,
+        username: login,
+        verify_token: sessionId,
+        password: password,
+        salt: saltHex,
+        public_bundle_json: JSON.stringify({
+          bundle_json: cryptoData.publicBundle.bundleJson,
+          signature: cryptoData.publicBundle.signature
+        }),
+        vault_json: JSON.stringify({
+          encrypted_payload: cryptoData.vault.encryptedPayload,
+          nonce: cryptoData.vault.nonce,
+          auth_tag: cryptoData.vault.authTag
+        })
+      };
       
-      // сохраняем фейковый jwt токен (типа chekcSession потом сработает)
+      console.log('[system] mock api: POST /api/v1/auth/register', payload);
+      
+      // сохраняем фейковый jwt токен (типа checkSession потом сработает)
       const mockJwt = { email, login, token: 'mock_jwt_token_from_server' };
       localStorage.setItem(SESSION_KEY, JSON.stringify(mockJwt));
+      
+      // костыль для мока: сохраняем креды, чтобы можно было залогиниться после логаута
+      const localUsers = getLocalUsers();
+      localUsers.push({ email, login, password });
+      localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(localUsers));
       
       return true;
     } catch (error) {
@@ -79,6 +110,21 @@ export const authService = {
     localStorage.removeItem(SESSION_KEY);
   },
   
+  updateAvatar: (base64String) => {
+    const session = authService.checkSession();
+    if (session) {
+      session.avatar = base64String;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      
+      const localUsers = getLocalUsers();
+      const userIndex = localUsers.findIndex(u => u.login === session.login);
+      if (userIndex !== -1) {
+        localUsers[userIndex].avatar = base64String;
+        localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(localUsers));
+      }
+    }
+  },
+
   checkSession: () => {
     const session = localStorage.getItem(SESSION_KEY);
     return session ? JSON.parse(session) : null;
