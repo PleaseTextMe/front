@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ASCII Image Test</title>
+</head>
+<body>
+  <div style="margin-bottom: 20px;">
+    <input type="file" id="image-upload" accept="image/*">
+    <label style="margin-left: 20px;">разрешение (детализация):</label>
+    <input type="number" id="resolution" value="80" style="width: 60px;">
+  </div>
+  
+  <!-- скрытые холсты для математики и отрисовки -->
+  <canvas id="math-canvas" style="display:none;"></canvas>
+  <canvas id="render-canvas" style="display:none;"></canvas>
+  
+  <!-- финальный результат -->
+  <div class="image-container">
+    <img id="final-image" src="" alt="result" style="max-width: 100%;">
+  </div>
+
+  <script>
+    const ASCII_CHARS = [' ', '.', ',', ':', ';', '+', '*', '?', '%', 'S', '#', '@'];
+    
+    const upload = document.getElementById('image-upload');
+    const resolutionInput = document.getElementById('resolution');
+    
+    const mathCanvas = document.getElementById('math-canvas');
+    const mathCtx = mathCanvas.getContext('2d', { willReadFrequently: true });
+    
+    const renderCanvas = document.getElementById('render-canvas');
+    const renderCtx = renderCanvas.getContext('2d');
+    
+    const outputImage = document.getElementById('final-image');
+
+    let currentImg = null;
+
+    upload.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        currentImg = new Image();
+        currentImg.onload = () => {
+          generateAsciiImage();
+        };
+        currentImg.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    resolutionInput.addEventListener('input', () => {
+      if (currentImg) generateAsciiImage();
+    });
+
+    function generateAsciiImage() {
+      // сжимаем оригинальную картинку, чтобы получить сетку пикселей
+      const resolution = parseInt(resolutionInput.value) || 80;
+      const aspectRatio = currentImg.height / currentImg.width;
+      
+      const cols = resolution;
+      const rows = Math.floor(cols * aspectRatio * 0.5); // 0.5 из-за вытянутости шрифтов
+
+      mathCanvas.width = cols;
+      mathCanvas.height = rows;
+      mathCtx.drawImage(currentImg, 0, 0, cols, rows);
+
+      const imageData = mathCtx.getImageData(0, 0, cols, rows);
+      const pixels = imageData.data;
+
+      // создаем новый большой холст и рисуем на нем текст
+      const charWidth = 10;
+      const charHeight = 20;
+      
+      renderCanvas.width = cols * charWidth;
+      renderCanvas.height = rows * charHeight;
+
+      // заливаем фон черным
+      renderCtx.fillStyle = '#0c0c0c';
+      renderCtx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
+
+      // настраиваем зеленый моноширинный шрифт
+      renderCtx.fillStyle = '#00ff00';
+      renderCtx.font = `${charHeight}px "Courier New", monospace`;
+      renderCtx.textAlign = 'left';
+      renderCtx.textBaseline = 'top';
+
+      // проходимся по пикселям сжатой картинки и рисуем символы на большом холсте
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const offset = (y * cols + x) * 4;
+          const r = pixels[offset];
+          const g = pixels[offset + 1];
+          const b = pixels[offset + 2];
+          const a = pixels[offset + 3];
+
+          if (a < 128) continue; // пропускаем прозрачные пиксели
+
+          const brightness = (0.299 * r + 0.587 * g + 0.114 * b);
+          const charIndex = Math.floor((brightness / 255) * (ASCII_CHARS.length - 1));
+          const char = ASCII_CHARS[charIndex];
+          
+          if (char !== ' ') {
+            renderCtx.fillText(char, x * charWidth, y * charHeight);
+          }
+        }
+      }
+
+      // конвертация в пнг: превращаем нарисованный холст в строку base64
+      const finalBase64 = renderCanvas.toDataURL('image/png');
+      
+      // вставляем строку прямо в тег имг
+      outputImage.src = finalBase64;
+    }
+  </script>
+</body>
+</html>
