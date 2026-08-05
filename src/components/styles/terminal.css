@@ -1,0 +1,258 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Fira Code', 'Courier New', monospace;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    background-color: #0c0c0c;
+    color: #00ff00;
+    overflow: hidden;
+}
+
+::selection {
+    background: #00ff00;
+    color: #0c0c0c;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0c0c0c;
+}
+::-webkit-scrollbar-thumb {
+    background: #00ff00;
+}
+
+.app-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    padding: 15px;
+    gap: 15px;
+}
+
+.ascii-frame {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+.ascii-row {
+    display: flex;
+    line-height: 1;
+    width: 100%;
+}
+.ascii-line-h {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    min-width: 0;
+}
+.ascii-line-h::before {
+    content: "--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------";
+}
+.ascii-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+.ascii-line-v {
+    width: 1ch;
+    overflow: hidden;
+    line-height: 1.5;
+    min-height: 0;
+}
+.ascii-line-v::before {
+    content: "|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n";
+    white-space: pre-wrap;
+}
+.ascii-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.side/* фейковый мигающий курсор потому что стандартный системный нельзя сделать блочным */
+.block-cursor {
+    padding: 5px;
+    cursor: pointer;
+}
+.sidebar-user:hover, button:hover {
+    background-color: #00ff00;
+    color: #0c0c0c;
+}
+
+.main-chat {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.chat-header h2 {
+    font-size: 16px;
+    font-weight: normal;
+}
+
+.chat-history {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.message {
+    line-height: 1.5;
+}
+.timestamp {
+    color: #008800;
+}
+.username {
+    color: #ffffff;
+}
+
+.chat-input-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+::placeholder {
+    color: #00aa00;
+    opacity: 1;
+}
+.input-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+input {
+    background: transparent;
+    border: none;
+    color: #00ff00;
+    outline: none;
+    width: 100%;
+    font-family: inherit;
+    font-size: 16px;
+    caret-color: #00ff00;
+}
+
+button {
+    background: transparent;
+    border: none;
+    color: #00ff00;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 16px;
+    padding: 5px 10px;
+}
+
+.auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100vw;
+    height: 100vh;
+}
+.auth-box-wrapper {
+    width: 500px;
+    max-width: 100%;
+}
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.auth-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ascii-logo {
+    white-space: pre;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.2;
+    margin-bottom: 20px;
+}
+
+/* 2fa animations */
+.scanline-container {
+    position: relative;
+    overflow: hidden;
+}
+.scanline {
+    position: absolute;
+    top: -100px;
+    left: 0;
+    width: 100%;
+    height: 10px;
+    background: rgba(0, 255, 0, 0.3);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+    animation: scan 2s linear infinite;
+    pointer-events: none;
+    z-index: 10;
+}
+@keyframes scan {
+    0% { top: -100px; }
+    100% { top: 100vh; }
+}
+
+.glitch {
+    position: relative;
+    display: inline-block;
+    color: #00ff00;
+}
+.glitch::before, .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #0c0c0c;
+}
+.glitch::before {
+    left: 2px;
+    text-shadow: -1px 0 red;
+    animation: glitch-anim 2s infinite linear alternate-reverse;
+}
+.glitch::after {
+    left: -2px;
+    text-shadow: -1px 0 blue;
+    animation: glitch-anim 3s infinite linear alternate-reverse;
+}
+@keyframes glitch-anim {
+    0% { clip-path: inset(20% 0 80% 0); }
+    20% { clip-path: inset(60% 0 10% 0); }
+    40% { clip-path: inset(40% 0 50% 0); }
+    60% { clip-path: inset(80% 0 5% 0); }
+    80% { clip-path: inset(10% 0 70% 0); }
+    100% { clip-path: inset(30% 0 20% 0); }
+}
