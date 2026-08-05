@@ -67,9 +67,9 @@ export const authService = {
       
       console.log('[system] mock api: POST /api/v1/auth/register', payload);
       
-      // сохраняем фейковый jwt токен (типа checkSession потом сработает)
-      const mockJwt = { email, login, token: 'mock_jwt_token_from_server' };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(mockJwt));
+      // сохраняем фейковый auth токен (типа checkSession потом сработает)
+      const mockAuthToken = { email, login, token: 'mock_unlimited_auth_token_from_server' };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(mockAuthToken));
       
       // костыль для мока: сохраняем креды, чтобы можно было залогиниться после логаута
       const localUsers = getLocalUsers();
