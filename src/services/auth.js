@@ -154,7 +154,20 @@ export const authService = {
     }
   },
 
-  logout: () => {
+  logout: async () => {
+    const session = authService.checkSession();
+    if (session && session.token) {
+      try {
+        await fetch(`${API_BASE}/logout/`, {
+          method: 'POST',
+          headers: {
+            'x-auth-token': session.token
+          }
+        });
+      } catch (e) {
+        console.error('logout error:', e);
+      }
+    }
     localStorage.removeItem(SESSION_KEY);
   },
   
