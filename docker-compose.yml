@@ -1,11 +1,13 @@
-version: '3.8'
-
 services:
-  whattowrite-chat:
+  frontend:
     build: .
+    container_name: please_text_me_frontend
     ports:
       - "5173:5173"
     volumes:
       - ./src:/app/src
+      - ./public:/app/public
+      - ./vite.config.js:/app/vite.config.js
     environment:
       - CHOKIDAR_USEPOLLING=true
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1

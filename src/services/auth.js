@@ -3,7 +3,7 @@ import { cryptoService } from './crypto';
 
 const SESSION_KEY = 'chat_session_user';
 const LOCAL_USERS_KEY = 'chat_registered_users';
-const API_BASE = 'http://localhost:8000/api/v1/auth';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1') + '/auth';
 
 const getLocalUsers = () => {
   const data = localStorage.getItem(LOCAL_USERS_KEY);
