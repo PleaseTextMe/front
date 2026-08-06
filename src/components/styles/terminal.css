@@ -36,6 +36,9 @@ body, html {
     height: 100vh;
     padding: 15px;
     gap: 15px;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
 }
 
 .ascii-frame {
@@ -50,12 +53,16 @@ body, html {
     display: flex;
     line-height: 1;
     width: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex-shrink: 0;
 }
 .ascii-line-h {
     flex: 1;
     overflow: hidden;
     white-space: nowrap;
-    min-width: 0;
+    width: 0;
+    min-width: 100%;
 }
 .ascii-line-h::before {
     content: "--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------";
@@ -65,16 +72,21 @@ body, html {
     flex: 1;
     overflow: hidden;
     min-height: 0;
+    min-width: 0;
 }
 .ascii-line-v {
     width: 1ch;
+    max-width: 1ch;
+    flex-shrink: 0;
     overflow: hidden;
     line-height: 1.5;
-    min-height: 0;
+    height: 0;
+    min-height: 100%;
 }
 .ascii-line-v::before {
     content: "|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n|\n";
     white-space: pre-wrap;
+    word-break: break-all;
 }
 .ascii-content {
     flex: 1;
@@ -82,6 +94,8 @@ body, html {
     padding: 15px;
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    min-height: 0;
 }
 
 .sidebar {
@@ -90,6 +104,8 @@ body, html {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-height: 0;
+    min-width: 0;
 }
 .side/* фейковый мигающий курсор потому что стандартный системный нельзя сделать блочным */
 .block-cursor {
@@ -179,10 +195,12 @@ button {
     align-items: center;
     width: 100vw;
     height: 100vh;
+    overflow: hidden;
 }
 .auth-box-wrapper {
     width: 500px;
     max-width: 100%;
+    min-width: 0;
 }
 .auth-form {
     display: flex;
@@ -241,18 +259,18 @@ button {
 .glitch::before {
     left: 2px;
     text-shadow: -1px 0 red;
-    animation: glitch-anim 2s infinite linear alternate-reverse;
+    animation: glitch-anim 6s infinite linear alternate-reverse;
 }
 .glitch::after {
     left: -2px;
     text-shadow: -1px 0 blue;
-    animation: glitch-anim 3s infinite linear alternate-reverse;
+    animation: glitch-anim 8s infinite linear alternate-reverse;
 }
 @keyframes glitch-anim {
-    0% { clip-path: inset(20% 0 80% 0); }
-    20% { clip-path: inset(60% 0 10% 0); }
-    40% { clip-path: inset(40% 0 50% 0); }
-    60% { clip-path: inset(80% 0 5% 0); }
-    80% { clip-path: inset(10% 0 70% 0); }
-    100% { clip-path: inset(30% 0 20% 0); }
+    0% { clip-path: inset(20% 0 78% 0); }
+    20% { clip-path: inset(60% 0 38% 0); }
+    40% { clip-path: inset(40% 0 58% 0); }
+    60% { clip-path: inset(80% 0 18% 0); }
+    80% { clip-path: inset(10% 0 88% 0); }
+    100% { clip-path: inset(30% 0 68% 0); }
 }
