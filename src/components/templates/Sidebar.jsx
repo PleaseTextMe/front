@@ -3,9 +3,7 @@ import { strings } from '../../config/strings.js';
 import { authService } from '../../services/auth.js';
 import AsciiFrame from './AsciiFrame.jsx';
 
-function Sidebar({ onAction, onLogout }) {
-  const users = strings.sidebar.usersList;
-  const activeUser = users[0]; //из масива юзерлист в стрингах
+function Sidebar({ contacts, activeContact, onSelectContact, onLogout }) {
   const session = authService.checkSession();
   const avatar = session?.avatar;
 
@@ -21,9 +19,9 @@ function Sidebar({ onAction, onLogout }) {
         )}
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
-          {users.map(u => (
-            <div key={u} className="sidebar-user" onClick={() => onAction(u)}>
-              {u === activeUser ? '> ' : '  '}{u.toUpperCase()}
+          {contacts.map(c => (
+            <div key={c} className="sidebar-user" onClick={() => onSelectContact(c)}>
+              {c === activeContact ? '> ' : '  '}{c.toUpperCase()}
             </div>
           ))}
         </div>

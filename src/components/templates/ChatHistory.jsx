@@ -16,13 +16,16 @@ function ChatHistory({ messages }) {
         <span className="username">{strings.chat.systemUser}</span>
         <span>{strings.chat.connectionMsg}</span>
       </div>
-      {messages.map((msg) => (
-        <div key={msg.id} className="message">
-          <span className="timestamp">[{new Date(msg.id).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}]</span>
-          <span className="username">{strings.chat.localUser}</span>
-          <span> {msg.text}</span>
-        </div>
-      ))}
+      {messages.map((msg) => {
+        const time = new Date(msg.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        return (
+          <div key={msg.id} className="message">
+            <span className="timestamp">[{time}]</span>
+            <span className="username">&lt;{msg.sender}&gt;:</span>
+            <span> {msg.text}</span>
+          </div>
+        );
+      })}
       <div ref={endRef} />
     </div>
   );
