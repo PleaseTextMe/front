@@ -19,6 +19,7 @@ export const strings = {
     toLoginText: "[ GO_TO_LOGIN ]",
     errorUserExists: "[ERROR] юзер существует",
     errorPasswordsNotMatch: "[ERROR] пароли не совпадают",
+    errorInvalidChars: "[ERROR] используйте только латиницу и символы",
     verificationTitle: "=== 2FA VERIFICATION ===",
     verificationSubtitle: "enter 6-digit code from email:",
     verificationPlaceholder: "code:",

@@ -25,8 +25,16 @@ function AuthPage({ onLogin }) {
     e.preventDefault();
     setError('');
 
+    // проверка: только латинские буквы, цифры и спецсимволы (печатный ASCII)
+    const isValidPassword = (pwd) => /^[\x20-\x7E]*$/.test(pwd);
+
     // логин
     if (!isRegisterMode) {
+      if (!isValidPassword(password)) {
+        setError(strings.auth.errorInvalidChars);
+        return;
+      }
+      
       setIsLoading(true);
       const success = await authService.login(email, password);
       setIsLoading(false);
@@ -41,6 +49,11 @@ function AuthPage({ onLogin }) {
 
     // регистрация: шаг 3 (финал)
     if (registerStep === 3) {
+      if (!isValidPassword(password)) {
+        setError(strings.auth.errorInvalidChars);
+        return;
+      }
+      
       if (password !== confirmPassword) {
         setError(strings.auth.errorPasswordsNotMatch);
         return;
