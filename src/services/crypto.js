@@ -156,5 +156,40 @@ export const cryptoService = {
       console.error("Vault decryption failed:", e);
       return null;
     }
+  },
+
+  // шифрование сообщения
+  encryptMessage: async (text, myPrivateKeyBase64, recipientPublicKeyBase64) => {
+    const sodium = await cryptoService.init();
+    const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
+    
+    const messageBytes = strToUint8Array(text);
+    const myPriv = base64ToUint8Array(myPrivateKeyBase64);
+    const theirPub = base64ToUint8Array(recipientPublicKeyBase64);
+    
+    const ciphertext = sodium.crypto_box_easy(messageBytes, nonce, theirPub, myPriv);
+    
+    return {
+      ciphertext: uint8ArrayToBase64(ciphertext),
+      nonce: uint8ArrayToBase64(nonce)
+    };
+  },
+
+  // расшифровка сообщения
+  decryptMessage: async (ciphertextBase64, nonceBase64, myPrivateKeyBase64, senderPublicKeyBase64) => {
+    const sodium = await cryptoService.init();
+    
+    const ciphertext = base64ToUint8Array(ciphertextBase64);
+    const nonce = base64ToUint8Array(nonceBase64);
+    const myPriv = base64ToUint8Array(myPrivateKeyBase64);
+    const theirPub = base64ToUint8Array(senderPublicKeyBase64);
+    
+    try {
+      const decrypted = sodium.crypto_box_open_easy(ciphertext, nonce, theirPub, myPriv);
+      return new TextDecoder().decode(decrypted);
+    } catch (e) {
+      console.error("message decryption failed:", e);
+      return "[зашифрованное сообщение]";
+    }
   }
 };
