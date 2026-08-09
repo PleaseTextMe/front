@@ -19,11 +19,17 @@ function Sidebar({ contacts, activeContact, onSelectContact, onLogout }) {
         )}
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
-          {contacts.map(c => (
-            <div key={c} className="sidebar-user" onClick={() => onSelectContact(c)}>
-              {c === activeContact ? '> ' : '  '}{c.toUpperCase()}
+          {contacts.length === 0 ? (
+            <div style={{ color: '#555', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
+              .юзеров пока нет
             </div>
-          ))}
+          ) : (
+            contacts.map(c => (
+              <div key={c} className="sidebar-user" onClick={() => onSelectContact(c)}>
+                {c === activeContact ? '> ' : '  '}{c.toUpperCase()}
+              </div>
+            ))
+          )}
         </div>
         {onLogout && (
           <div style={{ marginTop: '20px' }}>

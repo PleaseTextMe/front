@@ -40,7 +40,6 @@ export const strings = {
   // === сайдбар ===
   sidebar: {
     title: "=== USERS ===",
-    usersList: ['веня', 'осёл', 'аркадий'],
     logoutButton: "[ LOGOUT ]",
   },
 

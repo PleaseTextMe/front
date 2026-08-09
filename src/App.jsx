@@ -10,6 +10,8 @@ import { strings } from './config/strings.js';
 import { authService } from './services/auth.js';
 import { messageService } from './services/messageService.js';
 
+const AUTH_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState('chat'); // 'chat' | 'profile'
@@ -21,20 +23,29 @@ function App() {
   useEffect(() => {
     if (authService.checkSession()) {
       setIsAuthenticated(true);
-      
-      // Загружаем контакты (локальные + хардкод из strings)
-      const data = localStorage.getItem('chat_registered_users');
-      const localUsers = data ? JSON.parse(data).map(u => u.login) : [];
-      const session = authService.checkSession();
-      // Убираем себя из списка
-      const allContacts = [...new Set([...strings.sidebar.usersList, ...localUsers])].filter(c => c !== session?.login);
-      
-      setContacts(allContacts);
-      if (allContacts.length > 0) {
-        setActiveContact(allContacts[0]);
-      }
+      fetchUsers();
     }
   }, []);
+
+  const fetchUsers = async () => {
+    const session = authService.checkSession();
+    if (!session) return;
+    try {
+      const response = await fetch(`${AUTH_API_BASE}/users/`);
+      if (response.ok) {
+        const users = await response.json();
+        const usernames = users.map(u => u.username).filter(u => u !== session.login);
+        setContacts(usernames);
+        if (usernames.length > 0 && !activeContact) {
+          setActiveContact(usernames[0]);
+        }
+      } else {
+        console.error('failed to fetch users:', response.status);
+      }
+    } catch (err) {
+      console.error('error fetching users:', err);
+    }
+  };
 
   // Загрузка сообщений при смене активного контакта (или периодически)
   useEffect(() => {
@@ -107,7 +118,7 @@ function App() {
         <AsciiFrame>
           {currentView === 'chat' ? (
             <>
-              <ChatHeader onMenuClick={handleMenuClick} />
+              <ChatHeader onMenuClick={handleMenuClick} contactName={activeContact} />
               <ChatHistory messages={currentMessages} />
               <ChatInput onSendMessage={handleSendMessage} />
             </>

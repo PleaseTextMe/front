@@ -104,6 +104,11 @@ export const cryptoService = {
       publicBundle: {
         bundleJson: publicBundle,
         signature: uint8ArrayToBase64(signature)
+      },
+      keys: {
+        identity_priv_ed25519: uint8ArrayToBase64(identityKeypair.privateKey),
+        agreement_priv_x25519: uint8ArrayToBase64(agreementKeypair.privateKey),
+        pq_kem_priv_mlkem: uint8ArrayToBase64(pqKemPriv)
       }
     };
   },

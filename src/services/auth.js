@@ -143,9 +143,14 @@ export const authService = {
 
       const data = await response.json();
       
-      // сохраняем реальный auth токен от сервера
-      const authToken = { email, login, token: data.auth_token };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(authToken));
+      // сохраняем реальный auth токен от сервера вместе с ключами, чтобы можно было шифровать сообщения без релогина
+      const sessionData = { 
+        email, 
+        login, 
+        token: data.auth_token,
+        keys: cryptoData.keys // Добавили ключи в сессию!
+      };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
       
       return true;
     } catch (error) {
