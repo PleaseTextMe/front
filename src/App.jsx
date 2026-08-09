@@ -47,15 +47,42 @@ function App() {
     }
   };
 
-  // Загрузка сообщений при смене активного контакта (или периодически)
+  // Загрузка сообщений при смене активного контакта
   useEffect(() => {
     if (isAuthenticated && activeContact) {
       loadMessages(activeContact);
-      // Мок-пуллинг (чтобы видеть исходящие/входящие при тесте на двух вкладках)
-      const interval = setInterval(() => loadMessages(activeContact), 2000);
-      return () => clearInterval(interval);
     }
   }, [isAuthenticated, activeContact]);
+
+  // Глобальное WebSocket подключение для реалтайм обновлений
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const session = authService.checkSession();
+    if (!session) return;
+
+    let ws = new WebSocket(`ws://localhost:8001/api/v1/messages/ws?token=${session.token}`);
+    
+    ws.onopen = () => console.log("[ws] connected");
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      // Если пришло сообщение, обновляем чат с нужным контактом
+      const contactToUpdate = msg.sender_login === session.login ? msg.recipient_login : msg.sender_login;
+      
+      // Обновляем текущий открытый чат
+      if (activeContact === contactToUpdate) {
+        loadMessages(activeContact);
+      } else {
+        // Можно загрузить в фоне, чтобы бейдж или история обновилась
+        loadMessages(contactToUpdate);
+      }
+    };
+    
+    ws.onclose = () => console.log("[ws] disconnected");
+
+    return () => {
+      ws.close();
+    };
+  }, [isAuthenticated, activeContact]); // Зависит от activeContact, чтобы знать текущий открытый чат
 
   const loadMessages = async (contact) => {
     const chatHistory = await messageService.getMessages(contact);
