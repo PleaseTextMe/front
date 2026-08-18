@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { strings } from '../../config/strings.js';
 
-function ChatInput({ onSendMessage }) {
+function ChatInput({ onSendMessage, onTyping }) {
   const [inputValue, setInputValue] = useState('');
 
   // слушаем нажатие enter чтобы можно было отправлять сообщения без мышки
@@ -18,7 +18,10 @@ function ChatInput({ onSendMessage }) {
         <input 
           type="text" 
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            if (onTyping) onTyping();
+          }}
           onKeyDown={handleKeyPress}
           placeholder={strings.input.prompt}
           autoFocus
