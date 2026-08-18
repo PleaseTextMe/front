@@ -46,7 +46,9 @@ export const strings = {
   // === хэдер ===
   header: {
     contactName: "пидор (хопсо)",
-    status: "в сети",
+    statusOnline: "в сети",
+    statusOffline: "не в сети",
+    statusTyping: "печатает...",
     menuButton: "[ MENU ]",
     prefix: "connected to: ",
     statusPrefix: "status: "

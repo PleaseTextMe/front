@@ -19,6 +19,8 @@ function App() {
   const [contacts, setContacts] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
   const [messages, setMessages] = useState({}); // { 'contactLogin': [...] }
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [typingUsers, setTypingUsers] = useState({});
 
   useEffect(() => {
     if (authService.checkSession()) {
@@ -47,6 +49,8 @@ function App() {
     }
   };
 
+  const wsRef = React.useRef(null);
+
   // Загрузка сообщений при смене активного контакта
   useEffect(() => {
     if (isAuthenticated && activeContact) {
@@ -61,10 +65,33 @@ function App() {
     if (!session) return;
 
     let ws = new WebSocket(`ws://localhost:8001/api/v1/messages/ws?token=${session.token}`);
+    wsRef.current = ws;
     
     ws.onopen = () => console.log("[ws] connected");
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
+      
+      if (msg.type === "presence") {
+        setOnlineUsers(prev => {
+          const newSet = new Set(prev);
+          if (msg.status === "online") newSet.add(msg.login);
+          else newSet.delete(msg.login);
+          return newSet;
+        });
+        return;
+      }
+      if (msg.type === "sync_presence") {
+        setOnlineUsers(new Set(msg.online_users));
+        return;
+      }
+      if (msg.type === "typing") {
+        setTypingUsers(prev => ({ ...prev, [msg.sender]: true }));
+        setTimeout(() => {
+          setTypingUsers(prev => ({ ...prev, [msg.sender]: false }));
+        }, 3000);
+        return;
+      }
+
       // Если пришло сообщение, обновляем чат с нужным контактом
       const contactToUpdate = msg.sender_login === session.login ? msg.recipient_login : msg.sender_login;
       
@@ -77,7 +104,10 @@ function App() {
       }
     };
     
-    ws.onclose = () => console.log("[ws] disconnected");
+    ws.onclose = () => {
+      console.log("[ws] disconnected");
+      if (wsRef.current === ws) wsRef.current = null;
+    };
 
     return () => {
       ws.close();
@@ -119,6 +149,15 @@ function App() {
     loadMessages(activeContact);
   };
 
+  const handleTyping = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && activeContact) {
+      wsRef.current.send(JSON.stringify({
+        type: "typing",
+        recipient_login: activeContact
+      }));
+    }
+  };
+
   const handleLogout = () => {
     authService.logout();
     setIsAuthenticated(false);
@@ -132,6 +171,11 @@ function App() {
   }
 
   const currentMessages = activeContact ? (messages[activeContact] || []) : [];
+  
+  const isOnline = activeContact ? Array.from(onlineUsers).some(u => u.toLowerCase() === activeContact.toLowerCase()) : false;
+  const isTyping = activeContact ? Object.keys(typingUsers).some(u => u.toLowerCase() === activeContact.toLowerCase() && typingUsers[u]) : false;
+  
+  const statusText = isTyping ? strings.header.statusTyping : (isOnline ? strings.header.statusOnline : strings.header.statusOffline);
 
   return (
     <div className="app-container">
@@ -145,9 +189,9 @@ function App() {
         <AsciiFrame>
           {currentView === 'chat' ? (
             <>
-              <ChatHeader onMenuClick={handleMenuClick} contactName={activeContact} />
+              <ChatHeader onMenuClick={handleMenuClick} contactName={activeContact} statusText={statusText} />
               <ChatHistory messages={currentMessages} />
-              <ChatInput onSendMessage={handleSendMessage} />
+              <ChatInput onSendMessage={handleSendMessage} onTyping={handleTyping} />
             </>
           ) : (
             <ProfileSettings onBack={() => setCurrentView('chat')} />
