@@ -1,9 +1,8 @@
-import users from '../config/users.json';
 import { cryptoService } from './crypto';
 
 const SESSION_KEY = 'chat_session_user';
 const LOCAL_USERS_KEY = 'chat_registered_users';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1') + '/auth';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '') + '/auth';
 
 const getLocalUsers = () => {
   const data = localStorage.getItem(LOCAL_USERS_KEY);
@@ -12,12 +11,24 @@ const getLocalUsers = () => {
 
 export const authService = {
   login: async (email, password) => {
+    let authToken;
     try {
+      const parametersResponse = await fetch(`${API_BASE}/login-parameters/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (!parametersResponse.ok) throw new Error('failed to get login parameters');
+      const { auth_version: authVersion } = await parametersResponse.json();
+      if (authVersion !== 1 && authVersion !== 2) throw new Error('unsupported authentication version');
+      const credential = authVersion === 2
+        ? await cryptoService.deriveAuthCredential(password, email)
+        : password;
       // 1. Делаем POST запрос для логина (получаем auth_token)
       const loginResponse = await fetch(`${API_BASE}/login/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password: credential })
       });
 
       if (!loginResponse.ok) {
@@ -25,7 +36,7 @@ export const authService = {
       }
       
       const loginData = await loginResponse.json();
-      const authToken = loginData.auth_token;
+      authToken = loginData.auth_token;
 
       // 2. Получаем профиль пользователя, чтобы достать vault
       const meResponse = await fetch(`${API_BASE}/me/`, {
@@ -53,9 +64,14 @@ export const authService = {
         keys: decryptedKeys
       };
       
-      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
       return true;
     } catch (e) {
+      if (authToken) {
+        try {
+          await fetch(`${API_BASE}/logout/`, { method: 'POST', headers: { 'x-auth-token': authToken } });
+        } catch { /* Preserve the original login failure. */ }
+      }
       console.error('login error:', e);
       return false;
     }
@@ -109,15 +125,15 @@ export const authService = {
 
   register: async (email, login, password, verifyToken) => {
     try {
-      // генерим ключи и вольт (сейф) без соли (используем статичную внутри crypto.js)
-      const cryptoData = await cryptoService.generateRegistrationData(password);
+      // Generate encryption keys and a randomly salted vault.
+      const cryptoData = await cryptoService.generateRegistrationData(password, email);
       
       // формируем нормальный вложенный json для бэкенда
       const payload = {
         email: email,
         username: login,
         verify_token: verifyToken,
-        password: password,
+        password: cryptoData.authHash,
         public_bundle: {
           bundle_json: cryptoData.publicBundle.bundleJson,
           signature: cryptoData.publicBundle.signature
@@ -125,11 +141,11 @@ export const authService = {
         vault: {
           encrypted_payload: cryptoData.vault.encryptedPayload,
           nonce: cryptoData.vault.nonce,
-          auth_tag: cryptoData.vault.authTag
+          auth_tag: cryptoData.vault.authTag,
+          kdf_salt: cryptoData.vault.kdfSalt,
+          auth_version: 2
         }
       };
-      
-      console.log('[system] api: POST /api/v1/auth/register', payload);
       
       const response = await fetch(`${API_BASE}/register/`, {
         method: 'POST',
@@ -150,7 +166,7 @@ export const authService = {
         token: data.auth_token,
         keys: cryptoData.keys // Добавили ключи в сессию!
       };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
       
       return true;
     } catch (error) {
@@ -161,6 +177,8 @@ export const authService = {
 
   logout: async () => {
     const session = authService.checkSession();
+    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
     if (session && session.token) {
       try {
         await fetch(`${API_BASE}/logout/`, {
@@ -173,14 +191,13 @@ export const authService = {
         console.error('logout error:', e);
       }
     }
-    localStorage.removeItem(SESSION_KEY);
   },
   
   updateAvatar: (base64String) => {
     const session = authService.checkSession();
     if (session) {
       session.avatar = base64String;
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       
       const localUsers = getLocalUsers();
       const userIndex = localUsers.findIndex(u => u.login === session.login);
@@ -192,7 +209,18 @@ export const authService = {
   },
 
   checkSession: () => {
-    const session = localStorage.getItem(SESSION_KEY);
-    return session ? JSON.parse(session) : null;
+    try {
+      const session = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+      if (!session) return null;
+      const parsed = JSON.parse(session);
+      if (!parsed?.token || !parsed?.login || !parsed?.keys) throw new Error('Invalid session');
+      sessionStorage.setItem(SESSION_KEY, session);
+      localStorage.removeItem(SESSION_KEY);
+      return parsed;
+    } catch {
+      sessionStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
   }
 };
