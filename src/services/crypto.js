@@ -2,7 +2,13 @@ import _sodium from 'libsodium-wrappers-sumo';
 
 // утилиты для конвертации данных
 const strToUint8Array = (str) => new TextEncoder().encode(str);
-const uint8ArrayToBase64 = (arr) => btoa(String.fromCharCode.apply(null, arr));
+const uint8ArrayToBase64 = (arr) => {
+  let binary = '';
+  for (let index = 0; index < arr.length; index += 32768) {
+    binary += String.fromCharCode(...arr.subarray(index, index + 32768));
+  }
+  return btoa(binary);
+};
 const base64ToUint8Array = (base64) => {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
@@ -19,15 +25,27 @@ export const cryptoService = {
     return _sodium;
   },
 
-  // статичная соль (заглушка для argon2id, так как мы отказались от серверной соли)
+  // Legacy salt, only used to decrypt vaults created before random salts.
   staticSalt: new Uint8Array(16),
 
   // генерим ключи и вольт (сейф) при регистрации
-  generateRegistrationData: async (password) => {
+  deriveAuthCredential: async (password, email) => {
+    const sodium = await cryptoService.init();
+    const salt = sodium.crypto_generichash(16, strToUint8Array(`PleaseTextMe:auth:v2:${email.trim().toLowerCase()}`));
+    const key = sodium.crypto_pwhash(
+      32, strToUint8Array(password), salt,
+      sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
+      sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+      sodium.crypto_pwhash_ALG_ARGON2ID13
+    );
+    return uint8ArrayToBase64(key);
+  },
+
+  generateRegistrationData: async (password, email) => {
     const sodium = await cryptoService.init();
     
-    // деривация ключей (kdf) с использованием хардкодной соли
-    const salt = cryptoService.staticSalt;
+    // Each new vault gets a random Argon2id salt.
+    const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
     
     const derivedKey = sodium.crypto_pwhash(
       64,
@@ -38,27 +56,21 @@ export const cryptoService = {
       sodium.crypto_pwhash_ALG_ARGON2ID13
     );
 
-    // разделяем 64 байта на auth и vault ключи
-    const keyAuth = derivedKey.slice(0, 32);
+    // Preserve the 64-byte legacy KDF layout for vault compatibility.
     const keyVault = derivedKey.slice(32, 64);
 
-    // хэшируем key_auth для отправки на сервер
-    const authHash = sodium.crypto_generichash(32, keyAuth);
+    // Derive a separate, domain-specific login credential.
+    const authHash = await cryptoService.deriveAuthCredential(password, email);
 
     // генерация e2e ключей
     const identityKeypair = sodium.crypto_sign_keypair();
     const agreementKeypair = sodium.crypto_box_keypair();
     
-    // ml-kem (заглушка до подключения wasm-порта kyber)
-    // генерируем случайные байты в качестве заглушки
-    const pqKemPub = sodium.randombytes_buf(1184);
-    const pqKemPriv = sodium.randombytes_buf(2400);
 
     // формирование и шифрование сейфа (vault)
     const vaultData = JSON.stringify({
       identity_priv_ed25519: uint8ArrayToBase64(identityKeypair.privateKey),
-      agreement_priv_x25519: uint8ArrayToBase64(agreementKeypair.privateKey),
-      pq_kem_priv_mlkem: uint8ArrayToBase64(pqKemPriv)
+      agreement_priv_x25519: uint8ArrayToBase64(agreementKeypair.privateKey)
     });
 
     // шифрование aes-gcm через web crypto api (т.к. браузер поддерживает аппаратно)
@@ -84,8 +96,7 @@ export const cryptoService = {
     // формирование публичного бандла
     const publicBundle = JSON.stringify({
       identity_pub_ed25519: uint8ArrayToBase64(identityKeypair.publicKey),
-      agreement_pub_x25519: uint8ArrayToBase64(agreementKeypair.publicKey),
-      pq_kem_pub_mlkem: uint8ArrayToBase64(pqKemPub)
+      agreement_pub_x25519: uint8ArrayToBase64(agreementKeypair.publicKey)
     });
 
     // подписываем публичный бандл приватным ключом ed25519
@@ -95,11 +106,12 @@ export const cryptoService = {
     );
 
     return {
-      authHash: uint8ArrayToBase64(authHash),
+      authHash,
       vault: {
         encryptedPayload: uint8ArrayToBase64(ciphertext),
         nonce: uint8ArrayToBase64(iv),
-        authTag: uint8ArrayToBase64(authTag)
+        authTag: uint8ArrayToBase64(authTag),
+        kdfSalt: uint8ArrayToBase64(salt)
       },
       publicBundle: {
         bundleJson: publicBundle,
@@ -107,8 +119,7 @@ export const cryptoService = {
       },
       keys: {
         identity_priv_ed25519: uint8ArrayToBase64(identityKeypair.privateKey),
-        agreement_priv_x25519: uint8ArrayToBase64(agreementKeypair.privateKey),
-        pq_kem_priv_mlkem: uint8ArrayToBase64(pqKemPriv)
+        agreement_priv_x25519: uint8ArrayToBase64(agreementKeypair.privateKey)
       }
     };
   },
@@ -116,7 +127,7 @@ export const cryptoService = {
   // расшифровка vault при логине
   decryptVault: async (password, vaultData) => {
     const sodium = await cryptoService.init();
-    const salt = cryptoService.staticSalt;
+    const salt = vaultData.kdf_salt ? base64ToUint8Array(vaultData.kdf_salt) : cryptoService.staticSalt;
 
     // 1. Деривация ключа для расшифровки
     const derivedKey = sodium.crypto_pwhash(
@@ -161,6 +172,17 @@ export const cryptoService = {
       console.error("Vault decryption failed:", e);
       return null;
     }
+  },
+
+  verifyPublicBundle: async (publicBundle) => {
+    const sodium = await cryptoService.init();
+    const bundle = JSON.parse(publicBundle.bundle_json);
+    if (!sodium.crypto_sign_verify_detached(
+      base64ToUint8Array(publicBundle.signature),
+      strToUint8Array(publicBundle.bundle_json),
+      base64ToUint8Array(bundle.identity_pub_ed25519)
+    )) throw new Error('Invalid public key bundle signature');
+    return bundle;
   },
 
   // шифрование сообщения
