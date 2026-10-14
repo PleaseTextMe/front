@@ -8,9 +8,9 @@ import AsciiFrame from './components/templates/AsciiFrame.jsx';
 import ProfileSettings from './components/templates/ProfileSettings.jsx';
 import { strings } from './config/strings.js';
 import { authService } from './services/auth.js';
-import { messageService } from './services/messageService.js';
+import { messageService, getMessagesWebSocketUrl } from './services/messageService.js';
 
-const AUTH_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const AUTH_API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '');
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -21,6 +21,7 @@ function App() {
   const [messages, setMessages] = useState({}); // { 'contactLogin': [...] }
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState({});
+  const [sendError, setSendError] = useState('');
 
   useEffect(() => {
     if (authService.checkSession()) {
@@ -50,6 +51,7 @@ function App() {
   };
 
   const wsRef = React.useRef(null);
+  const historyLoadsRef = React.useRef({});
 
   // Загрузка сообщений при смене активного контакта
   useEffect(() => {
@@ -64,58 +66,74 @@ function App() {
     const session = authService.checkSession();
     if (!session) return;
 
-    let ws = new WebSocket(`ws://localhost:8001/api/v1/messages/ws?token=${session.token}`);
-    wsRef.current = ws;
+    let disposed = false;
+    let reconnectTimer;
+    let ws;
+    const connect = () => {
+      if (disposed) return;
+      ws = new WebSocket(getMessagesWebSocketUrl(session.token));
+      wsRef.current = ws;
     
-    ws.onopen = () => console.log("[ws] connected");
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
+      ws.onopen = () => console.log("[ws] connected");
+      ws.onmessage = (event) => {
+        if (disposed) return;
+        let msg;
+        try { msg = JSON.parse(event.data); } catch { return; }
+        if (!msg || typeof msg !== 'object') return;
       
-      if (msg.type === "presence") {
-        setOnlineUsers(prev => {
-          const newSet = new Set(prev);
-          if (msg.status === "online") newSet.add(msg.login);
-          else newSet.delete(msg.login);
-          return newSet;
-        });
-        return;
-      }
-      if (msg.type === "sync_presence") {
-        setOnlineUsers(new Set(msg.online_users));
-        return;
-      }
-      if (msg.type === "typing") {
-        setTypingUsers(prev => ({ ...prev, [msg.sender]: true }));
-        setTimeout(() => {
-          setTypingUsers(prev => ({ ...prev, [msg.sender]: false }));
-        }, 3000);
-        return;
-      }
+        if (msg.type === "presence") {
+          setOnlineUsers(prev => {
+            const newSet = new Set(prev);
+            if (msg.status === "online") newSet.add(msg.login);
+            else newSet.delete(msg.login);
+            return newSet;
+          });
+          return;
+        }
+        if (msg.type === "sync_presence") {
+          setOnlineUsers(new Set(msg.online_users));
+          return;
+        }
+        if (msg.type === "typing") {
+          setTypingUsers(prev => ({ ...prev, [msg.sender]: true }));
+          setTimeout(() => {
+            setTypingUsers(prev => ({ ...prev, [msg.sender]: false }));
+          }, 3000);
+          return;
+        }
 
-      // Если пришло сообщение, обновляем чат с нужным контактом
-      const contactToUpdate = msg.sender_login === session.login ? msg.recipient_login : msg.sender_login;
+        // Если пришло сообщение, обновляем чат с нужным контактом
+        const contactToUpdate = msg.sender_login === session.login ? msg.recipient_login : msg.sender_login;
       
-      // Обновляем текущий открытый чат
-      if (activeContact === contactToUpdate) {
-        loadMessages(activeContact);
-      } else {
-        // Можно загрузить в фоне, чтобы бейдж или история обновилась
-        loadMessages(contactToUpdate);
-      }
-    };
+        if (contactToUpdate) loadMessages(contactToUpdate);
+      };
     
-    ws.onclose = () => {
-      console.log("[ws] disconnected");
-      if (wsRef.current === ws) wsRef.current = null;
+      ws.onclose = (event) => {
+        console.log("[ws] disconnected");
+        if (wsRef.current === ws) wsRef.current = null;
+        if (disposed) return;
+        setOnlineUsers(new Set());
+        if (authService.checkSession()?.token === session.token && event.code !== 1008) {
+          reconnectTimer = setTimeout(connect, 2000);
+        }
+      };
     };
+    connect();
 
     return () => {
-      ws.close();
+      disposed = true;
+      clearTimeout(reconnectTimer);
+      ws?.close();
     };
-  }, [isAuthenticated, activeContact]); // Зависит от activeContact, чтобы знать текущий открытый чат
+  }, [isAuthenticated]);
 
   const loadMessages = async (contact) => {
+    const token = authService.checkSession()?.token;
+    const request = (historyLoadsRef.current[contact] || 0) + 1;
+    historyLoadsRef.current[contact] = request;
     const chatHistory = await messageService.getMessages(contact);
+    if (!token || authService.checkSession()?.token !== token) return;
+    if (historyLoadsRef.current[contact] !== request) return;
     setMessages(prev => ({ ...prev, [contact]: chatHistory }));
   };
 
@@ -130,11 +148,14 @@ function App() {
   };
 
   const handleSendMessage = async (text) => {
-    if (!activeContact) return;
+    if (!activeContact) return false;
     
     // Временно рисуем у себя в UI (оптимистично)
     const tempId = Date.now().toString();
     const session = authService.checkSession();
+    if (!session) return false;
+    setSendError('');
+    const contact = activeContact;
     const optimisticMsg = { id: tempId, text, sender: session.login, timestamp: Math.floor(Date.now() / 1000) };
     
     setMessages(prev => ({
@@ -142,11 +163,18 @@ function App() {
       [activeContact]: [...(prev[activeContact] || []), optimisticMsg]
     }));
 
-    // Отправляем реально (моком)
-    await messageService.sendMessage(activeContact, text);
+    // Send the encrypted message.
+    const sent = await messageService.sendMessage(contact, text);
+    if (authService.checkSession()?.token !== session.token) return false;
+    if (!sent) {
+      setMessages(prev => ({ ...prev, [contact]: (prev[contact] || []).filter(m => m.id !== tempId) }));
+      setSendError('Не удалось отправить сообщение. Проверьте подключение и ключи получателя.');
+      return false;
+    }
     
     // Перезагружаем сообщения чтобы получить правильный ID и сохраненный стейт
-    loadMessages(activeContact);
+    await loadMessages(contact);
+    return true;
   };
 
   const handleTyping = () => {
@@ -161,6 +189,12 @@ function App() {
   const handleLogout = () => {
     authService.logout();
     setIsAuthenticated(false);
+    setMessages({});
+    setContacts([]);
+    setActiveContact(null);
+    setOnlineUsers(new Set());
+    setTypingUsers({});
+    setSendError('');
   };
 
   if (!isAuthenticated) {
@@ -191,6 +225,7 @@ function App() {
             <>
               <ChatHeader onMenuClick={handleMenuClick} contactName={activeContact} statusText={statusText} />
               <ChatHistory messages={currentMessages} />
+              {sendError && <div role="alert" style={{ color: '#ff5555', padding: '10px' }}>{sendError}</div>}
               <ChatInput onSendMessage={handleSendMessage} onTyping={handleTyping} />
             </>
           ) : (
